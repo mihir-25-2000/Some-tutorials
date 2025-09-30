@@ -84,3 +84,57 @@ w, b = params
 print("\nFinal params:")
 print("w:", w, " b:", float(b))
 print("Final train accuracy:", float(accuracy(params, X, y)))
+
+
+# Debugging jax code
+k1 = random.PRNGKey(0)
+
+def sample_batch(k1, n=5):
+    return random.normal(k1, (n,))
+
+for step in range(3):
+    # BUG: reusing 'key' directly
+    batch = sample_batch(k1)
+    print(step, batch[:3])
+
+print("Returns same values each time!")   
+
+#Fixed
+for step in range(3):
+    k1, subkey = random.split(k1)
+    batch = sample_batch(subkey)
+    print(step, batch[:3])
+print("Returns different values each time!")
+
+# Debugged jax code 2
+print("Debugging vmap shape mismatch error")
+def affine(x, w, b):
+    return w * x + b  
+
+x = jnp.arange(5.)
+w = jnp.ones((5,))
+b = jnp.array(3.)
+
+f = jax.vmap(affine, in_axes=(0, 0, None))  #Shape mismatch under vmap
+print(f(x, w, b))  
+
+
+# Debug 3
+print("TASK 3: Debugging nondiff ops")
+def loss(w, x):
+    # BUG: argmax is nondiff, blocks gradient
+    cls = jnp.argmax(w * x)
+    return jnp.float32(cls)
+
+x = jnp.array([1., 2., 3.])
+print(grad(loss)(1.0, x))
+
+# Fixed 3 
+def loss(w, x):
+    # smooth max of w*x; differentiable everywhere
+    return jax.scipy.special.logsumexp(w * x)
+
+x = jnp.array([1., 2., 3.])
+print(grad(loss)(1.0, x))
+
+
